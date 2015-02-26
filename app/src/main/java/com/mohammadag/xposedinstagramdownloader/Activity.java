@@ -120,8 +120,11 @@ public class Activity extends android.app.Activity {
 
             SharedPreferences prfs = getSharedPreferences("Hooks", Context.MODE_WORLD_READABLE);
             int savedVersion = prfs.getInt("Version", 1);
+            String hookcheck = prfs.getString("Hooks", null);
+            String hook = "123";
 
-            Toast toast = null;
+            Toast toast;
+
 
                 String hooks = total.toString();
                 String[] html = hooks.split("<p>");
@@ -132,26 +135,32 @@ public class Activity extends android.app.Activity {
                     max++;
                 }
 
-                for (String data : html) {
-                    count++;
-                    Code = Integer.toString(version);
-                    if (data.contains(Code)) {
-                        data = data.replace("<p>", "");
-                        data = data.replace("</p>", "");
-                        Hooks(data);
-                        count = 69;
-                    } else {
-                        if (count == max) {
-                            System.out.println("Trying default hook!");
-                            String fallback = html[1];
-                            fallback = fallback.replace("<p>", "");
-                            fallback = fallback.replace("</p>", "");
-                            Hooks(fallback);
-                        }
+            for (String data : html) {
+                count++;
+                Code = Integer.toString(version);
+                if (data.contains(Code)) {
+                    data = data.replace("<p>", "");
+                    data = data.replace("</p>", "");
+                    Hooks(data);
+                    hook = data;
+                    count = 69;
+                } else {
+                    if (count == max) {
+                        System.out.println("Trying default hook!");
+                        String fallback = html[1];
+                        fallback = fallback.replace("<p>", "");
+                        fallback = fallback.replace("</p>", "");
+                        hook = fallback;
+                        Hooks(fallback);
                     }
                 }
+            }
 
-            toast = Toast.makeText(getApplicationContext(), "Hooks have been updated.\nPlease reboot!", Toast.LENGTH_LONG);
+            if (version == savedVersion && hookcheck.equals(hook)) {
+                toast = Toast.makeText(getApplicationContext(), "You already have the latest hooks", Toast.LENGTH_LONG);
+            } else {
+                toast = Toast.makeText(getApplicationContext(), "Hooks have been updated.\nPlease reboot!", Toast.LENGTH_LONG);
+            }
             TextView v = (TextView) toast.getView().findViewById(android.R.id.message);
             if( v != null) v.setGravity(Gravity.CENTER);
             toast.show();
