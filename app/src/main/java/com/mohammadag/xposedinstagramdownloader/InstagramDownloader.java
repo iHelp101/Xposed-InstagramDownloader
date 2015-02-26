@@ -1,5 +1,7 @@
 package com.mohammadag.xposedinstagramdownloader;
 
+import static de.robv.android.xposed.XposedHelpers.callMethod;
+import static de.robv.android.xposed.XposedHelpers.callStaticMethod;
 import static de.robv.android.xposed.XposedHelpers.findAndHookMethod;
 import static de.robv.android.xposed.XposedHelpers.findClass;
 import static de.robv.android.xposed.XposedHelpers.getObjectField;
@@ -17,6 +19,9 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.app.DownloadManager;
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -30,10 +35,12 @@ import android.os.Environment;
 import android.text.TextUtils;
 import android.view.MotionEvent;
 import android.view.View;
+import android.widget.RemoteViews;
 import android.widget.Toast;
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.IXposedHookZygoteInit;
 import de.robv.android.xposed.XC_MethodHook;
+import de.robv.android.xposed.XSharedPreferences;
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
@@ -46,52 +53,78 @@ public class InstagramDownloader implements IXposedHookLoadPackage, IXposedHookZ
 	private Object mCurrentDirectShareMediaOptionButton;
 	private static final String mDownloadString = "Download";
 	private static String mDownloadTranslated;
-	private static final boolean PRINT_VIEW_CLASS_NAMES = BuildConfig.DEBUG;
 
 	private static Context mContext;
+    private static XSharedPreferences mPreferences;
 
 	private static Class<?> MediaType;
 	private static Class<?> User;
 
-	private static final String FEED_CLASS_NAME = "com.instagram.android.feed.a.a.aa";
-	private static final String MEDIA_CLASS_NAME = "com.instagram.feed.d.l";
-	private static final String MEDIA_TYPE_CLASS_NAME = "com.instagram.model.a.a";
-	private static final String USER_CLASS_NAME = "com.instagram.user.c.a";
-	private static final String MEDIA_OPTIONS_BUTTON_CLASS_NAME = "com.instagram.android.feed.a.a.x";
+	private static String FEED_CLASS_NAME = null;
+	private static String MEDIA_CLASS_NAME = null;
+	private static String MEDIA_TYPE_CLASS_NAME = null;
+	private static String USER_CLASS_NAME = null;
+	private static String MEDIA_OPTIONS_BUTTON_CLASS_NAME = null;
+	private static String DS_MEDIA_OPTIONS_BUTTON_CLASS_NAME = null;
+	private static String DS_PERM_MORE_OPTIONS_DIALOG_CLASS_NAME = null;
+    private static String MEDIA_OPTIONS_BUTTON_HOOK = null;
+    private static String MEDIA_OPTIONS_BUTTON_HOOK2 = null;
+    private static String PERM__HOOK = null;
+    private static String PERM__HOOK2 = null;
+    private static String mMEDIA_HOOK = null;
+    private static String VIDEOTYPE_HOOK = null;
+    private static String mMEDIA_VIDEO_HOOK = null;
+    private static String mMEDIA_PHOTO_HOOK = null;
+    private static String USERNAME_HOOK = null;
+    private static String FULLNAME__HOOK = null;
 
-	private static final String DS_PACKAGE_NAME = "com.instagram.android.directshare.d";
-	private static final String DS_MEDIA_OPTIONS_BUTTON_CLASS_NAME = DS_PACKAGE_NAME + ".ad";
-	private static final String DS_PERM_MORE_OPTIONS_DIALOG_CLASS_NAME = DS_PACKAGE_NAME + ".ai";
 
-	private static void log(String log) {
+
+    private static void log(String log) {
 		XposedBridge.log("InstagramDownloader: " + log);
 	}
 
-	@Override
-	public void initZygote(StartupParam startupParam) throws Throwable {
-		if (!PRINT_VIEW_CLASS_NAMES)
-			return;
-
-		findAndHookMethod(View.class, "onTouchEvent", MotionEvent.class, new XC_MethodHook() {
-			@Override
-			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-				android.util.Log.d("Xposed", param.thisObject.getClass().getName());
-			}
-		});
-	}
+    @Override
+    public void initZygote(IXposedHookZygoteInit.StartupParam startupParam) throws Throwable {
+        mPreferences = new XSharedPreferences("com.mohammadag.xposedinstagramdownloader", "Hooks");
+    }
 
 	@Override
 	public void handleLoadPackage(LoadPackageParam lpparam) throws Throwable {
 		if (!lpparam.packageName.equals("com.instagram.android"))
 			return;
 
-		XposedHelpers.findAndHookMethod("com.instagram.android.activity.ActivityInTab",
-				lpparam.classLoader, "onCreate", Bundle.class, new XC_MethodHook() {
-			@Override
-			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-				mContext = (Activity) param.thisObject;
-			}
-		});
+        // Thank you to KeepChat For the Following Code Snippet
+        // http://git.io/JJZPaw
+        Object activityThread = callStaticMethod(findClass("android.app.ActivityThread", null), "currentActivityThread");
+        final Context context = (Context) callMethod(activityThread, "getSystemContext");
+
+        final int versionCheck = context.getPackageManager().getPackageInfo(lpparam.packageName, 0).versionCode;
+        //End Snippet
+
+        XposedBridge.log("Version Code: "+versionCheck);
+
+        FEED_CLASS_NAME = mPreferences.getString("First", null);
+        MEDIA_CLASS_NAME = mPreferences.getString("Second", null);
+        MEDIA_TYPE_CLASS_NAME = mPreferences.getString("Third", null);
+        USER_CLASS_NAME = mPreferences.getString("Fourth", null);
+        MEDIA_OPTIONS_BUTTON_CLASS_NAME = mPreferences.getString("Fifth", null);
+        DS_MEDIA_OPTIONS_BUTTON_CLASS_NAME = mPreferences.getString("Sixth", null);
+        DS_PERM_MORE_OPTIONS_DIALOG_CLASS_NAME = mPreferences.getString("Seventh", null);
+        MEDIA_OPTIONS_BUTTON_HOOK = mPreferences.getString("Eighth", null);
+        MEDIA_OPTIONS_BUTTON_HOOK2 = mPreferences.getString("Ninth", null);
+        PERM__HOOK = mPreferences.getString("Tenth", null);
+        PERM__HOOK2 = mPreferences.getString("Eleventh", null);
+        mMEDIA_HOOK = mPreferences.getString("Twelfth", null);
+        VIDEOTYPE_HOOK = mPreferences.getString("Thirteenth", null);
+        mMEDIA_VIDEO_HOOK = mPreferences.getString("Fourteenth", null);
+        mMEDIA_PHOTO_HOOK = mPreferences.getString("Fifteenth", null);
+        USERNAME_HOOK = mPreferences.getString("Sixteenth", null);
+        FULLNAME__HOOK = mPreferences.getString("Seventeenth", null);
+
+        XposedBridge.log("Button: "+PERM__HOOK);
+
+        mContext = context;
 
 		/* Hi Facebook team! Obfuscating the package isn't enough */
 		final Class<?> MediaOptionsButton = findClass(MEDIA_OPTIONS_BUTTON_CLASS_NAME, lpparam.classLoader);
@@ -143,17 +176,17 @@ public class InstagramDownloader implements IXposedHookLoadPackage, IXposedHookZ
 			}
 		};
 
-		findAndHookMethod(MediaOptionsButton, "b", injectDownloadIntoCharSequenceHook);
-		findAndHookMethod(DirectSharePermalinkMoreOptionsDialog, "b", injectDownloadIntoCharSequenceHook);
+		findAndHookMethod(MediaOptionsButton, MEDIA_OPTIONS_BUTTON_HOOK, injectDownloadIntoCharSequenceHook);
+        findAndHookMethod(MediaOptionsButton, MEDIA_OPTIONS_BUTTON_HOOK2, new XC_MethodHook() {
+            @Override
+            protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                mCurrentMediaOptionButton = param.thisObject;
+            }
+        });
 
-		findAndHookMethod(MediaOptionsButton, "a", new XC_MethodHook() {
-			@Override
-			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-				mCurrentMediaOptionButton = param.thisObject;
-			}
-		});
 
-		findAndHookMethod(DirectSharePermalinkMoreOptionsDialog, "a", new XC_MethodHook() {
+		findAndHookMethod(DirectSharePermalinkMoreOptionsDialog, PERM__HOOK, injectDownloadIntoCharSequenceHook);
+		findAndHookMethod(DirectSharePermalinkMoreOptionsDialog, PERM__HOOK2, new XC_MethodHook() {
 			@Override
 			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
 				mCurrentDirectShareMediaOptionButton = param.thisObject;
@@ -201,14 +234,15 @@ public class InstagramDownloader implements IXposedHookLoadPackage, IXposedHookZ
 		findAndHookMethod(MenuClickListener, "onClick", DialogInterface.class, int.class, new XC_MethodHook() {
 			@Override
 			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-				if (mContext == null)
-					mContext = ((Dialog) param.args[0]).getContext();
+				if (mContext == null) {
+                    mContext = context;
+                }
 				CharSequence localCharSequence = mMenuOptions[(Integer) param.args[1]];
 				if (mDownloadString.equals(localCharSequence)) {
 					Object mMedia = null;
 
 					try {
-						mMedia = getObjectField(mCurrentMediaOptionButton, "h");
+						mMedia = getObjectField(mCurrentMediaOptionButton, mMEDIA_HOOK);
 					} catch (NoSuchFieldError e) {
 						log("Failed to get media: " + e.getMessage());
 						e.printStackTrace();
@@ -254,7 +288,11 @@ public class InstagramDownloader implements IXposedHookLoadPackage, IXposedHookZ
 			return;
 		}
 
-		Object videoType = getStaticObjectField(MediaType, "b");
+		Object videoType = getStaticObjectField(MediaType, VIDEOTYPE_HOOK);
+
+        if (videoType == null) {
+            log("Video Type not found!");
+        }
 
 		String linkToDownload;
 		String filenameExtension;
@@ -267,12 +305,14 @@ public class InstagramDownloader implements IXposedHookLoadPackage, IXposedHookZ
 //		}
 
 		if (mMediaType.equals(videoType)) {
-			linkToDownload = (String) getObjectField(mMedia, "n");
+            XposedBridge.log(mMEDIA_VIDEO_HOOK);
+            linkToDownload = (String) getObjectField(mMedia, mMEDIA_VIDEO_HOOK);
 			filenameExtension = "mp4";
 			descriptionType = "video";
 			descriptionTypeId = R.string.video;
 		} else {
-			linkToDownload = (String) getObjectField(mMedia, "m");
+            XposedBridge.log(mMEDIA_PHOTO_HOOK);
+			linkToDownload = (String) getObjectField(mMedia, mMEDIA_PHOTO_HOOK);
 			filenameExtension = "jpg";
 			descriptionType = "photo";
 			descriptionTypeId = R.string.photo;
@@ -291,19 +331,12 @@ public class InstagramDownloader implements IXposedHookLoadPackage, IXposedHookZ
 			userName = "username_placeholder";
 			userFullName = "Unknown name";
 		} else {
-			userName = (String) getObjectField(mUser, "a");
-			userFullName = (String) getObjectField(mUser, "b");
+			userName = (String) getObjectField(mUser, USERNAME_HOOK);
+			userFullName = (String) getObjectField(mUser, FULLNAME__HOOK);
 		}
 
-		String itemId;
-		try {
-			itemId = (String) getObjectField(mMedia, "e");
-		} catch (Throwable t) {
-			log("Failed to get Media item id, using current time in filename");
-			t.printStackTrace();
-			SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.ENGLISH);
-			itemId = sdf.format(new Date());
-		}
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.ENGLISH);
+        String itemId = sdf.format(new Date());
 		String fileName = userName + "_" + itemId + "." + filenameExtension;
 
 		if (TextUtils.isEmpty(userFullName)) {
@@ -345,41 +378,21 @@ public class InstagramDownloader implements IXposedHookLoadPackage, IXposedHookZ
 	@SuppressLint("NewApi")
 	private static final void showRequiresDonatePackage(final Context context) {
 		String title = ResourceHelper.getString(context, R.string.requires_donation_package_title);
+        Toast.makeText(mContext, title, Toast.LENGTH_SHORT).show();
 
-		if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.HONEYCOMB) {
-			String message = ResourceHelper.getString(context, R.string.requires_donation_package_message);
-			String positiveButton = ResourceHelper.getString(context, R.string.go_to_play_store);
-			AlertDialog.Builder builder = new AlertDialog.Builder(context, android.R.style.Theme_Holo_Light_Dialog);
-			builder.setTitle(title);
-			builder.setMessage(message);
-			builder.setPositiveButton(positiveButton, new OnClickListener() {
-				@Override
-				public void onClick(DialogInterface dialog, int which) {
-					String url = "market://details?id=com.mohammadag.xposedinstagramdownloaderdonate";
-					Intent intent = new Intent(Intent.ACTION_VIEW).setData(Uri.parse(url));
-					intent.setPackage("com.android.vending");
-					try {
-						context.startActivity(intent);
-					} catch (ActivityNotFoundException e) {
-						String playStoreNotFound = ResourceHelper.getString(context, R.string.play_store_not_found);
-						Toast.makeText(context, playStoreNotFound, Toast.LENGTH_SHORT).show();
-					}
-				}
-			});
-			builder.create().show();
-		} else {
-			String url = "market://details?id=com.mohammadag.xposedinstagramdownloaderdonate";
-			Intent intent = new Intent(Intent.ACTION_VIEW).setData(Uri.parse(url));
-			intent.setPackage("com.android.vending");
-			Toast.makeText(context, title, Toast.LENGTH_SHORT).show();
-			try {
-				context.startActivity(intent);
-			} catch (ActivityNotFoundException e) {
-				String playStoreNotFound = ResourceHelper.getString(context, R.string.play_store_not_found);
-				Toast.makeText(context, playStoreNotFound, Toast.LENGTH_SHORT).show();
-			}
-		}
-	}
+        String url = null;
+
+        try {
+            context.getPackageManager().getPackageInfo("com.android.vending", 0);
+            url = "market://details?id=com.mohammadag.xposedinstagramdownloaderdonate";
+        } catch ( final Exception e ) {
+            url = "https://play.google.com/store/apps/details?id=com.mohammadag.xposedinstagramdownloaderdonate";
+        }
+
+        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        context.startActivity(intent);
+    }
 
 	private String getDownloadString() {
 		if (mDownloadTranslated == null)
