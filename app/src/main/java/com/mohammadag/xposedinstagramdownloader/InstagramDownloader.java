@@ -122,8 +122,6 @@ public class InstagramDownloader implements IXposedHookLoadPackage, IXposedHookZ
         USERNAME_HOOK = mPreferences.getString("Sixteenth", null);
         FULLNAME__HOOK = mPreferences.getString("Seventeenth", null);
 
-        XposedBridge.log("Button: "+PERM__HOOK);
-
         mContext = context;
 
 		/* Hi Facebook team! Obfuscating the package isn't enough */
@@ -305,13 +303,11 @@ public class InstagramDownloader implements IXposedHookLoadPackage, IXposedHookZ
 //		}
 
 		if (mMediaType.equals(videoType)) {
-            XposedBridge.log(mMEDIA_VIDEO_HOOK);
             linkToDownload = (String) getObjectField(mMedia, mMEDIA_VIDEO_HOOK);
 			filenameExtension = "mp4";
 			descriptionType = "video";
 			descriptionTypeId = R.string.video;
 		} else {
-            XposedBridge.log(mMEDIA_PHOTO_HOOK);
 			linkToDownload = (String) getObjectField(mMedia, mMEDIA_PHOTO_HOOK);
 			filenameExtension = "jpg";
 			descriptionType = "photo";

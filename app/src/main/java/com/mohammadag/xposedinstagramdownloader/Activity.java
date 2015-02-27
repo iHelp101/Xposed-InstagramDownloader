@@ -39,6 +39,13 @@ public class Activity extends android.app.Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
 
+        SharedPreferences prfs = getSharedPreferences("Hooks", Context.MODE_WORLD_READABLE);
+        String hookcheck = prfs.getString("Hooks", null);
+
+        if (hookcheck == null) {
+            getHooksHttp();
+        }
+
         Button button = (Button) findViewById(R.id.button);
 
         button.setOnClickListener(new View.OnClickListener() {
@@ -120,7 +127,7 @@ public class Activity extends android.app.Activity {
 
             SharedPreferences prfs = getSharedPreferences("Hooks", Context.MODE_WORLD_READABLE);
             int savedVersion = prfs.getInt("Version", 1);
-            String hookcheck = prfs.getString("Hooks", null);
+            String hookcheck = prfs.getString("Hooks", "321");
             String hook = "123";
 
             Toast toast;
@@ -192,7 +199,7 @@ public class Activity extends android.app.Activity {
         editor.putString("Fifteenth", split[15]);
         editor.putString("Sixteenth", split[16]);
         editor.putString("Seventeenth", split[17]);
-
+        editor.putString("Hooks", data);
         editor.putInt("Version", version);
         editor.apply();
     }
