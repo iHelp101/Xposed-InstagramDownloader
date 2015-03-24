@@ -1,19 +1,23 @@
 package com.mohammadag.xposedinstagramdownloader;
 
-import android.content.BroadcastReceiver;
+import android.annotation.TargetApi;
+import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.StrictMode;
-import android.speech.tts.TextToSpeech;
-import android.support.v4.view.ViewPager;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import com.nononsenseapps.filepicker.FilePickerActivity;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -26,12 +30,13 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 public class Activity extends android.app.Activity {
 
     private int version = 123;
+    private static int FILE_CODE = 0;
     String Code = "Missing";
 
     @Override
@@ -39,16 +44,22 @@ public class Activity extends android.app.Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
 
-        SharedPreferences prfs = getSharedPreferences("Hooks", Context.MODE_WORLD_READABLE);
-        String hookcheck = prfs.getString("Hooks", null);
+        final Button hooks = (Button) findViewById(R.id.button);
 
-        if (hookcheck == null) {
-            getHooksHttp();
-        }
+        final Button location = (Button) findViewById(R.id.button2);
 
-        Button button = (Button) findViewById(R.id.button);
+        location.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Intent i = new Intent(Activity.this, FilePickerActivity.class);
+                i.putExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false);
+                i.putExtra(FilePickerActivity.EXTRA_ALLOW_CREATE_DIR, true);
+                i.putExtra(FilePickerActivity.EXTRA_MODE, FilePickerActivity.MODE_DIR);
+                startActivityForResult(i, FILE_CODE);
+            }
+        });
 
-        button.setOnClickListener(new View.OnClickListener() {
+        hooks.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 getHooksHttp();
@@ -65,13 +76,12 @@ public class Activity extends android.app.Activity {
             PackageInfo p = packs.get(i);
             if (p.packageName.equals("com.instagram.android")) {
                 version = p.versionCode;
+                String fix = Integer.toString(version);
+                version = Integer.parseInt(fix);
             }
         }
 
-        System.out.println(version);
-
         StringBuilder total = null;
-        int broke = 0;
 
         try {
             DefaultHttpClient httpclient = new DefaultHttpClient();
@@ -119,60 +129,104 @@ public class Activity extends android.app.Activity {
             }
         } catch (Exception e) {
             System.out.println("Broke");
-            broke = 1;
         }
 
+        SharedPreferences prfs = getSharedPreferences("Hooks", Context.MODE_WORLD_READABLE);
+        int savedVersion = prfs.getInt("Version", 1);
+        String hookcheck = prfs.getString("Hooks", "321");
+        String hook = "123";
 
-        if (broke == 0) {
+        Toast toast;
 
-            SharedPreferences prfs = getSharedPreferences("Hooks", Context.MODE_WORLD_READABLE);
-            int savedVersion = prfs.getInt("Version", 1);
-            String hookcheck = prfs.getString("Hooks", "321");
-            String hook = "123";
+        String hooks = total.toString();
+        String[] html = hooks.split("<p>");
+
+        int count = 0;
+        int max = 0;
+        for (String data : html) {
+            max++;
+        }
+
+        for (String data : html) {
+            count++;
+            Code = Integer.toString(version);
+            if (data.contains(Code)) {
+                data = data.replace("<p>", "");
+                data = data.replace("</p>", "");
+                Hooks(data);
+                hook = data;
+                count = 69;
+            } else {
+                if (count == max) {
+                    System.out.println("Trying default hook!");
+                    String fallback = html[1];
+                    fallback = fallback.replace("<p>", "");
+                    fallback = fallback.replace("</p>", "");
+                    hook = fallback;
+                    Hooks(fallback);
+                }
+            }
+        }
+
+        if (version == savedVersion && hookcheck.equals(hook)) {
+            toast = Toast.makeText(getApplicationContext(), "You already have the latest hooks", Toast.LENGTH_LONG);
+        } else {
+            toast = Toast.makeText(getApplicationContext(), "Hooks have been updated.\nPlease kill the Instagram app.", Toast.LENGTH_LONG);
+        }
+        TextView v = (TextView) toast.getView().findViewById(android.R.id.message);
+        if( v != null) v.setGravity(Gravity.CENTER);
+        toast.show();
+    }
+
+    @TargetApi(Build.VERSION_CODES.JELLY_BEAN)
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == FILE_CODE && resultCode == Activity.RESULT_OK) {
+            Uri Location = null;
+            if (data.getBooleanExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false)) {
+                // For JellyBean and above
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                    ClipData clip = data.getClipData();
+
+                    if (clip != null) {
+                        for (int i = 0; i < clip.getItemCount(); i++) {
+                            Location = clip.getItemAt(i).getUri();
+                        }
+                    }
+                    // For Ice Cream Sandwich
+                } else {
+                    ArrayList<String> paths = data.getStringArrayListExtra
+                            (FilePickerActivity.EXTRA_PATHS);
+
+                    if (paths != null) {
+                        for (String path: paths) {
+                            Location = Uri.parse(path);
+                        }
+                    }
+                }
+
+            } else {
+                Location = data.getData();
+            }
 
             Toast toast;
 
+            if (Location.toString().contains("/storage/")) {
+                toast = Toast.makeText(getApplicationContext(), "Save location updated!.\nPlease kill the Instagram app.", Toast.LENGTH_LONG);
 
-                String hooks = total.toString();
-                String[] html = hooks.split("<p>");
-
-                int count = 0;
-                int max = 0;
-                for (String data : html) {
-                    max++;
-                }
-
-            for (String data : html) {
-                count++;
-                Code = Integer.toString(version);
-                if (data.contains(Code)) {
-                    data = data.replace("<p>", "");
-                    data = data.replace("</p>", "");
-                    Hooks(data);
-                    hook = data;
-                    count = 69;
-                } else {
-                    if (count == max) {
-                        System.out.println("Trying default hook!");
-                        String fallback = html[1];
-                        fallback = fallback.replace("<p>", "");
-                        fallback = fallback.replace("</p>", "");
-                        hook = fallback;
-                        Hooks(fallback);
-                    }
-                }
-            }
-
-            if (version == savedVersion && hookcheck.equals(hook)) {
-                toast = Toast.makeText(getApplicationContext(), "You already have the latest hooks", Toast.LENGTH_LONG);
+                SharedPreferences.Editor editor = getSharedPreferences("Hooks", Context.MODE_WORLD_READABLE).edit();
+                editor.putString("Save", Location.toString());
+                editor.apply();
             } else {
-                toast = Toast.makeText(getApplicationContext(), "Hooks have been updated.\nPlease reboot!", Toast.LENGTH_LONG);
+                toast = Toast.makeText(getApplicationContext(), "Unable to save here.\nPlease select another location.", Toast.LENGTH_LONG);
+
+                Intent i = new Intent(Activity.this, FilePickerActivity.class);
+                i.putExtra(FilePickerActivity.EXTRA_ALLOW_MULTIPLE, false);
+                i.putExtra(FilePickerActivity.EXTRA_ALLOW_CREATE_DIR, true);
+                i.putExtra(FilePickerActivity.EXTRA_MODE, FilePickerActivity.MODE_DIR);
+                startActivityForResult(i, FILE_CODE);
             }
-            TextView v = (TextView) toast.getView().findViewById(android.R.id.message);
-            if( v != null) v.setGravity(Gravity.CENTER);
-            toast.show();
-        } else {
-            Toast toast= Toast.makeText(getApplicationContext(), "Something went wrong.\nPlease check your data connection.", Toast.LENGTH_LONG);
+
             TextView v = (TextView) toast.getView().findViewById(android.R.id.message);
             if( v != null) v.setGravity(Gravity.CENTER);
             toast.show();

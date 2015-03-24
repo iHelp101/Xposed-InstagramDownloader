@@ -8,34 +8,30 @@ import static de.robv.android.xposed.XposedHelpers.getObjectField;
 import static de.robv.android.xposed.XposedHelpers.getStaticObjectField;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.lang.reflect.Field;
+import java.net.URI;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Locale;
 
 import android.annotation.SuppressLint;
-import android.app.Activity;
-import android.app.AlertDialog;
+import android.annotation.TargetApi;
+import android.app.AppOpsManager;
 import android.app.Dialog;
 import android.app.DownloadManager;
-import android.app.Notification;
-import android.app.NotificationManager;
-import android.app.PendingIntent;
-import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.DialogInterface;
-import android.content.DialogInterface.OnClickListener;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.net.Uri;
-import android.os.Bundle;
+import android.os.Build;
 import android.os.Environment;
 import android.text.TextUtils;
-import android.view.MotionEvent;
-import android.view.View;
-import android.widget.RemoteViews;
 import android.widget.Toast;
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.IXposedHookZygoteInit;
@@ -60,23 +56,24 @@ public class InstagramDownloader implements IXposedHookLoadPackage, IXposedHookZ
 	private static Class<?> MediaType;
 	private static Class<?> User;
 
-	private static String FEED_CLASS_NAME = null;
-	private static String MEDIA_CLASS_NAME = null;
-	private static String MEDIA_TYPE_CLASS_NAME = null;
-	private static String USER_CLASS_NAME = null;
-	private static String MEDIA_OPTIONS_BUTTON_CLASS_NAME = null;
-	private static String DS_MEDIA_OPTIONS_BUTTON_CLASS_NAME = null;
-	private static String DS_PERM_MORE_OPTIONS_DIALOG_CLASS_NAME = null;
-    private static String MEDIA_OPTIONS_BUTTON_HOOK = null;
-    private static String MEDIA_OPTIONS_BUTTON_HOOK2 = null;
-    private static String PERM__HOOK = null;
-    private static String PERM__HOOK2 = null;
-    private static String mMEDIA_HOOK = null;
-    private static String VIDEOTYPE_HOOK = null;
-    private static String mMEDIA_VIDEO_HOOK = null;
-    private static String mMEDIA_PHOTO_HOOK = null;
-    private static String USERNAME_HOOK = null;
-    private static String FULLNAME__HOOK = null;
+    private static String SAVE = "Instagram";
+	private static String FEED_CLASS_NAME = "Nope";
+	private static String MEDIA_CLASS_NAME = "Nope";
+	private static String MEDIA_TYPE_CLASS_NAME = "Nope";
+	private static String USER_CLASS_NAME = "Nope";
+	private static String MEDIA_OPTIONS_BUTTON_CLASS_NAME = "Nope";
+	private static String DS_MEDIA_OPTIONS_BUTTON_CLASS_NAME = "Nope";
+	private static String DS_PERM_MORE_OPTIONS_DIALOG_CLASS_NAME = "Nope";
+    private static String MEDIA_OPTIONS_BUTTON_HOOK = "Nope";
+    private static String MEDIA_OPTIONS_BUTTON_HOOK2 = "Nope";
+    private static String PERM__HOOK = "Nope";
+    private static String PERM__HOOK2 = "Nope";
+    private static String mMEDIA_HOOK = "Nope";
+    private static String VIDEOTYPE_HOOK = "Nope";
+    private static String mMEDIA_VIDEO_HOOK = "Nope";
+    private static String mMEDIA_PHOTO_HOOK = "Nope";
+    private static String USERNAME_HOOK = "Nope";
+    private static String FULLNAME__HOOK = "Nope";
 
 
 
@@ -102,167 +99,178 @@ public class InstagramDownloader implements IXposedHookLoadPackage, IXposedHookZ
         final int versionCheck = context.getPackageManager().getPackageInfo(lpparam.packageName, 0).versionCode;
         //End Snippet
 
-        XposedBridge.log("Version Code: "+versionCheck);
+        XposedBridge.log("Instagram Version Code: "+versionCheck);
 
-        FEED_CLASS_NAME = mPreferences.getString("First", null);
-        MEDIA_CLASS_NAME = mPreferences.getString("Second", null);
-        MEDIA_TYPE_CLASS_NAME = mPreferences.getString("Third", null);
-        USER_CLASS_NAME = mPreferences.getString("Fourth", null);
-        MEDIA_OPTIONS_BUTTON_CLASS_NAME = mPreferences.getString("Fifth", null);
-        DS_MEDIA_OPTIONS_BUTTON_CLASS_NAME = mPreferences.getString("Sixth", null);
-        DS_PERM_MORE_OPTIONS_DIALOG_CLASS_NAME = mPreferences.getString("Seventh", null);
-        MEDIA_OPTIONS_BUTTON_HOOK = mPreferences.getString("Eighth", null);
-        MEDIA_OPTIONS_BUTTON_HOOK2 = mPreferences.getString("Ninth", null);
-        PERM__HOOK = mPreferences.getString("Tenth", null);
-        PERM__HOOK2 = mPreferences.getString("Eleventh", null);
-        mMEDIA_HOOK = mPreferences.getString("Twelfth", null);
-        VIDEOTYPE_HOOK = mPreferences.getString("Thirteenth", null);
-        mMEDIA_VIDEO_HOOK = mPreferences.getString("Fourteenth", null);
-        mMEDIA_PHOTO_HOOK = mPreferences.getString("Fifteenth", null);
-        USERNAME_HOOK = mPreferences.getString("Sixteenth", null);
-        FULLNAME__HOOK = mPreferences.getString("Seventeenth", null);
+        mPreferences.reload();
+
+        if (mPreferences.getString("First", "Nope").equals("Nope")) {
+            mPreferences = new XSharedPreferences("com.mohammadag.xposedinstagramdownloader", "Hooks");
+        }
+
+        SAVE = mPreferences.getString("Save", "Instagram");
+        FEED_CLASS_NAME = mPreferences.getString("First", "Nope");
+        MEDIA_CLASS_NAME = mPreferences.getString("Second", "Nope");
+        MEDIA_TYPE_CLASS_NAME = mPreferences.getString("Third", "Nope");
+        USER_CLASS_NAME = mPreferences.getString("Fourth", "Nope");
+        MEDIA_OPTIONS_BUTTON_CLASS_NAME = mPreferences.getString("Fifth", "Nope");
+        DS_MEDIA_OPTIONS_BUTTON_CLASS_NAME = mPreferences.getString("Sixth", "Nope");
+        DS_PERM_MORE_OPTIONS_DIALOG_CLASS_NAME = mPreferences.getString("Seventh", "Nope");
+        MEDIA_OPTIONS_BUTTON_HOOK = mPreferences.getString("Eighth", "Nope");
+        MEDIA_OPTIONS_BUTTON_HOOK2 = mPreferences.getString("Ninth", "Nope");
+        PERM__HOOK = mPreferences.getString("Tenth", "Nope");
+        PERM__HOOK2 = mPreferences.getString("Eleventh", "Nope");
+        mMEDIA_HOOK = mPreferences.getString("Twelfth", "Nope");
+        VIDEOTYPE_HOOK = mPreferences.getString("Thirteenth", "Nope");
+        mMEDIA_VIDEO_HOOK = mPreferences.getString("Fourteenth", "Nope");
+        mMEDIA_PHOTO_HOOK = mPreferences.getString("Fifteenth", "Nope");
+        USERNAME_HOOK = mPreferences.getString("Sixteenth", "Nope");
+        FULLNAME__HOOK = mPreferences.getString("Seventeenth", "Nope");
 
         mContext = context;
 
-		/* Hi Facebook team! Obfuscating the package isn't enough */
-		final Class<?> MediaOptionsButton = findClass(MEDIA_OPTIONS_BUTTON_CLASS_NAME, lpparam.classLoader);
-		final Class<?> DirectSharePermalinkMoreOptionsDialog = findClass(DS_MEDIA_OPTIONS_BUTTON_CLASS_NAME,
-				lpparam.classLoader);
-		MediaType = findClass(MEDIA_TYPE_CLASS_NAME, lpparam.classLoader);
-		User = findClass(USER_CLASS_NAME, lpparam.classLoader);
+        if (FEED_CLASS_NAME.equals("Nope")||MEDIA_CLASS_NAME.equals("Nope")||MEDIA_TYPE_CLASS_NAME.equals("Nope")||USER_CLASS_NAME.equals("Nope")||MEDIA_OPTIONS_BUTTON_CLASS_NAME.equals("Nope")||DS_MEDIA_OPTIONS_BUTTON_CLASS_NAME.equals("Nope")||DS_PERM_MORE_OPTIONS_DIALOG_CLASS_NAME.equals("Nope")||MEDIA_OPTIONS_BUTTON_HOOK.equals("Nope")||MEDIA_OPTIONS_BUTTON_HOOK2.equals("Nope")||PERM__HOOK.equals("Nope")||PERM__HOOK2.equals("Nope")||mMEDIA_HOOK.equals("Nope")||VIDEOTYPE_HOOK.equals("Nope")||mMEDIA_VIDEO_HOOK.equals("Nope")||mMEDIA_PHOTO_HOOK .equals("Nope")||USERNAME_HOOK.equals("Nope")||FULLNAME__HOOK.equals("Nope")) {
+            XposedBridge.log("Please update hooks via the module.");
+        } else {
+		    /* Hi Facebook team! Obfuscating the package isn't enough */
+            final Class<?> MediaOptionsButton = findClass(MEDIA_OPTIONS_BUTTON_CLASS_NAME, lpparam.classLoader);
+            final Class<?> DirectSharePermalinkMoreOptionsDialog = findClass(DS_MEDIA_OPTIONS_BUTTON_CLASS_NAME,
+                    lpparam.classLoader);
+            MediaType = findClass(MEDIA_TYPE_CLASS_NAME, lpparam.classLoader);
+            User = findClass(USER_CLASS_NAME, lpparam.classLoader);
 
-		XC_MethodHook injectDownloadIntoCharSequenceHook = new XC_MethodHook() {
-			@Override
-			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-				CharSequence[] result = (CharSequence[]) param.getResult();
+            XC_MethodHook injectDownloadIntoCharSequenceHook = new XC_MethodHook() {
+                @Override
+                protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                    CharSequence[] result = (CharSequence[]) param.getResult();
 
-				ArrayList<String> array = new ArrayList<String>();
-				for (CharSequence sq : result)
-					array.add(sq.toString());
+                    ArrayList<String> array = new ArrayList<String>();
+                    for (CharSequence sq : result)
+                        array.add(sq.toString());
 
-				if (mContext == null) {
-					try {
-						Field f = XposedHelpers.findFirstFieldByExactType(param.thisObject.getClass(), Context.class);
-						f.setAccessible(true);
-						mContext = (Context) f.get(param.thisObject);
-					} catch (Throwable t) {
-						log("Unable to get Context, button not translated");
-					}
-				}
+                    if (mContext == null) {
+                        try {
+                            Field f = XposedHelpers.findFirstFieldByExactType(param.thisObject.getClass(), Context.class);
+                            f.setAccessible(true);
+                            mContext = (Context) f.get(param.thisObject);
+                        } catch (Throwable t) {
+                            log("Unable to get Context, button not translated");
+                        }
+                    }
 
-				if (mContext != null) {
-					mDownloadTranslated = ResourceHelper.getString(mContext, R.string.the_not_so_big_but_big_button);
-				}
+                    if (mContext != null) {
+                        mDownloadTranslated = ResourceHelper.getString(mContext, R.string.the_not_so_big_but_big_button);
+                    }
 
-				if (!array.contains(getDownloadString()))
-					array.add(getDownloadString());
-				CharSequence[] newResult = new CharSequence[array.size()];
-				array.toArray(newResult);
-				Field menuOptionsField;
-				if (param.thisObject.getClass().getName().contains("directshare")) {
-					menuOptionsField = XposedHelpers.findFirstFieldByExactType(param.thisObject.getClass(), CharSequence[].class);
-				} else {
-					menuOptionsField = XposedHelpers.findFirstFieldByExactType(MediaOptionsButton, CharSequence[].class);
-				}
-				menuOptionsField.set(param.thisObject, newResult);
-				if (param.thisObject.getClass().getName().contains("directshare")) {
-					mDirectShareMenuOptions  = (CharSequence[]) menuOptionsField.get(param.thisObject);
-				} else {
-					mMenuOptions = (CharSequence[]) menuOptionsField.get(param.thisObject);
-				}
-				param.setResult(newResult);
-			}
-		};
-
-		findAndHookMethod(MediaOptionsButton, MEDIA_OPTIONS_BUTTON_HOOK, injectDownloadIntoCharSequenceHook);
-        findAndHookMethod(MediaOptionsButton, MEDIA_OPTIONS_BUTTON_HOOK2, new XC_MethodHook() {
-            @Override
-            protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                mCurrentMediaOptionButton = param.thisObject;
-            }
-        });
-
-
-		findAndHookMethod(DirectSharePermalinkMoreOptionsDialog, PERM__HOOK, injectDownloadIntoCharSequenceHook);
-		findAndHookMethod(DirectSharePermalinkMoreOptionsDialog, PERM__HOOK2, new XC_MethodHook() {
-			@Override
-			protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-				mCurrentDirectShareMediaOptionButton = param.thisObject;
-			}
-		});
-
-		Class<?> DirectShareMenuClickListener = findClass(DS_PERM_MORE_OPTIONS_DIALOG_CLASS_NAME, lpparam.classLoader);
-		findAndHookMethod(DirectShareMenuClickListener, "onClick", DialogInterface.class, int.class, new XC_MethodHook() {
-			@Override
-			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-				CharSequence localCharSequence = mDirectShareMenuOptions[(Integer) param.args[1]];
-				if (mContext == null)
-					mContext = ((Dialog) param.args[0]).getContext();
-				if (getDownloadString().equals(localCharSequence)) {
-					Object mMedia = null;
-
-					Field[] mCurrentMediaOptionButtonFields =
-							mCurrentDirectShareMediaOptionButton.getClass().getDeclaredFields();
-					for (Field iField : mCurrentMediaOptionButtonFields) {
-						if (iField.getType().getName().equals(MEDIA_CLASS_NAME)) {
-							iField.setAccessible(true);
-							mMedia = iField.get(mCurrentDirectShareMediaOptionButton);
-							break;
-						}
-					}
-
-					if (mMedia == null) {
-						Toast.makeText(mContext, ResourceHelper.getString(mContext, R.string.direct_share_download_failed),
-								Toast.LENGTH_SHORT).show();
-						log("Unable to determine media");
-						return;
-					}
-
-					if (isPackageInstalled(mContext, "com.mohammadag.xposedinstagramdownloaderdonate")) {
-						downloadMedia(mCurrentDirectShareMediaOptionButton, mMedia);
-					} else {
-						showRequiresDonatePackage(mContext);
-					}
-					param.setResult(null);
-				}
-			}
-		});
-
-		Class<?> MenuClickListener = findClass(FEED_CLASS_NAME, lpparam.classLoader);
-		findAndHookMethod(MenuClickListener, "onClick", DialogInterface.class, int.class, new XC_MethodHook() {
-			@Override
-			protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-				if (mContext == null) {
-                    mContext = context;
+                    if (!array.contains(getDownloadString()))
+                        array.add(getDownloadString());
+                    CharSequence[] newResult = new CharSequence[array.size()];
+                    array.toArray(newResult);
+                    Field menuOptionsField;
+                    if (param.thisObject.getClass().getName().contains("directshare")) {
+                        menuOptionsField = XposedHelpers.findFirstFieldByExactType(param.thisObject.getClass(), CharSequence[].class);
+                    } else {
+                        menuOptionsField = XposedHelpers.findFirstFieldByExactType(MediaOptionsButton, CharSequence[].class);
+                    }
+                    menuOptionsField.set(param.thisObject, newResult);
+                    if (param.thisObject.getClass().getName().contains("directshare")) {
+                        mDirectShareMenuOptions = (CharSequence[]) menuOptionsField.get(param.thisObject);
+                    } else {
+                        mMenuOptions = (CharSequence[]) menuOptionsField.get(param.thisObject);
+                    }
+                    param.setResult(newResult);
                 }
-				CharSequence localCharSequence = mMenuOptions[(Integer) param.args[1]];
-				if (mDownloadString.equals(localCharSequence)) {
-					Object mMedia = null;
+            };
 
-					try {
-						mMedia = getObjectField(mCurrentMediaOptionButton, mMEDIA_HOOK);
-					} catch (NoSuchFieldError e) {
-						log("Failed to get media: " + e.getMessage());
-						e.printStackTrace();
-					}
+            findAndHookMethod(MediaOptionsButton, MEDIA_OPTIONS_BUTTON_HOOK, injectDownloadIntoCharSequenceHook);
+            findAndHookMethod(MediaOptionsButton, MEDIA_OPTIONS_BUTTON_HOOK2, new XC_MethodHook() {
+                @Override
+                protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                    mCurrentMediaOptionButton = param.thisObject;
+                }
+            });
 
-					if (mMedia == null) {
-						Toast.makeText(mContext, "Unable to determine media, download failed",
-								Toast.LENGTH_SHORT).show();
-						log("Unable to determine media");
-						return;
-					}
 
-					try {
-						downloadMedia(mCurrentMediaOptionButton, mMedia);
-					} catch (Throwable t) {
-						log("Unable to download media: " + t.getMessage());
-						t.printStackTrace();
-					}
-					param.setResult(null);
-				}
-			}
-		});
+            findAndHookMethod(DirectSharePermalinkMoreOptionsDialog, PERM__HOOK, injectDownloadIntoCharSequenceHook);
+            findAndHookMethod(DirectSharePermalinkMoreOptionsDialog, PERM__HOOK2, new XC_MethodHook() {
+                @Override
+                protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                    mCurrentDirectShareMediaOptionButton = param.thisObject;
+                }
+            });
+
+            Class<?> DirectShareMenuClickListener = findClass(DS_PERM_MORE_OPTIONS_DIALOG_CLASS_NAME, lpparam.classLoader);
+            findAndHookMethod(DirectShareMenuClickListener, "onClick", DialogInterface.class, int.class, new XC_MethodHook() {
+                @Override
+                protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                    CharSequence localCharSequence = mDirectShareMenuOptions[(Integer) param.args[1]];
+                    if (mContext == null)
+                        mContext = ((Dialog) param.args[0]).getContext();
+                    if (getDownloadString().equals(localCharSequence)) {
+                        Object mMedia = null;
+
+                        Field[] mCurrentMediaOptionButtonFields =
+                                mCurrentDirectShareMediaOptionButton.getClass().getDeclaredFields();
+                        for (Field iField : mCurrentMediaOptionButtonFields) {
+                            if (iField.getType().getName().equals(MEDIA_CLASS_NAME)) {
+                                iField.setAccessible(true);
+                                mMedia = iField.get(mCurrentDirectShareMediaOptionButton);
+                                break;
+                            }
+                        }
+
+                        if (mMedia == null) {
+                            Toast.makeText(mContext, ResourceHelper.getString(mContext, R.string.direct_share_download_failed),
+                                    Toast.LENGTH_SHORT).show();
+                            log("Unable to determine media");
+                            return;
+                        }
+
+                        if (isPackageInstalled(mContext, "com.mohammadag.xposedinstagramdownloaderdonate")) {
+                            downloadMedia(mCurrentDirectShareMediaOptionButton, mMedia);
+                        } else {
+                            showRequiresDonatePackage(mContext);
+                        }
+                        param.setResult(null);
+                    }
+                }
+            });
+
+            Class<?> MenuClickListener = findClass(FEED_CLASS_NAME, lpparam.classLoader);
+            findAndHookMethod(MenuClickListener, "onClick", DialogInterface.class, int.class, new XC_MethodHook() {
+                @Override
+                protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                    if (mContext == null) {
+                        mContext = context;
+                    }
+                    CharSequence localCharSequence = mMenuOptions[(Integer) param.args[1]];
+                    if (mDownloadString.equals(localCharSequence)) {
+                        Object mMedia = null;
+
+                        try {
+                            mMedia = getObjectField(mCurrentMediaOptionButton, mMEDIA_HOOK);
+                        } catch (NoSuchFieldError e) {
+                            log("Failed to get media: " + e.getMessage());
+                            e.printStackTrace();
+                        }
+
+                        if (mMedia == null) {
+                            Toast.makeText(mContext, "Unable to determine media, download failed",
+                                    Toast.LENGTH_SHORT).show();
+                            log("Unable to determine media");
+                            return;
+                        }
+
+                        try {
+                            downloadMedia(mCurrentMediaOptionButton, mMedia);
+                        } catch (Throwable t) {
+                            log("Unable to download media: " + t.getMessage());
+                            t.printStackTrace();
+                        }
+                        param.setResult(null);
+                    }
+                }
+            });
+        }
 	}
 
 	@SuppressLint("NewApi")
@@ -279,7 +287,6 @@ public class InstagramDownloader implements IXposedHookLoadPackage, IXposedHookZ
 			}
 		}
 
-		log("Downloading media...");
 		Object mMediaType = getFieldByType(mMedia, MediaType);
 		if (mMediaType == null) {
 			log("Failed to get MediaType");
@@ -339,10 +346,17 @@ public class InstagramDownloader implements IXposedHookLoadPackage, IXposedHookZ
 			userFullName = userName;
 		}
 
-		File directory =
-				new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getAbsolutePath() + "/Instagram");
-		if (!directory.exists())
-			directory.mkdirs();
+        if (SAVE.equals("Instagram")) {
+            File directory =
+                    new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getAbsolutePath() + "/Instagram");
+            if (!directory.exists())
+                directory.mkdirs();
+        } else {
+            File directory = new File(URI.create(SAVE).getPath());
+            if (!directory.exists()) {
+                directory.mkdirs();
+            }
+        }
 
 		String notificationTitle = ResourceHelper.getString(mContext, R.string.username_thing, userFullName, descriptionType);
 		String description = ResourceHelper.getString(mContext, R.string.instagram_item,
@@ -355,17 +369,21 @@ public class InstagramDownloader implements IXposedHookLoadPackage, IXposedHookZ
 			request.allowScanningByMediaScanner();
 			request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
 		}
-		request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "Instagram/" + fileName);
 
-		DownloadManager manager = (DownloadManager) mContext.getSystemService(Context.DOWNLOAD_SERVICE);
+        if (SAVE.equals("Instagram")) {
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "Instagram/" + fileName);
+        } else {
+            request.setDestinationUri(Uri.parse(SAVE + "/" +fileName));
+        }
+
+        DownloadManager manager = (DownloadManager) mContext.getSystemService(Context.DOWNLOAD_SERVICE);
 		manager.enqueue(request);
 	}
 
 	public static final boolean isPackageInstalled(Context context, String packageName) {
-		PackageManager pm = context.getPackageManager();
 		try {
-			pm.getPackageInfo(packageName, PackageManager.GET_META_DATA);
-			return "com.android.vending".equals(pm.getInstallerPackageName(packageName));
+            context.getPackageManager().getApplicationInfo(packageName, 0);
+			return true;
 		} catch (NameNotFoundException e) {
 			return false;
 		}
@@ -376,7 +394,7 @@ public class InstagramDownloader implements IXposedHookLoadPackage, IXposedHookZ
 		String title = ResourceHelper.getString(context, R.string.requires_donation_package_title);
         Toast.makeText(mContext, title, Toast.LENGTH_SHORT).show();
 
-        String url = null;
+        String url;
 
         try {
             context.getPackageManager().getPackageInfo("com.android.vending", 0);
@@ -406,4 +424,23 @@ public class InstagramDownloader implements IXposedHookLoadPackage, IXposedHookZ
 			return null;
 		}
 	}
+
+    private static int[] appendInt(int[] cur, int val)
+    {
+        if (cur == null) {
+            return new int[]
+                    { val };
+        }
+        final int N = cur.length;
+        for (int i = 0; i < N; i++) {
+            if (cur[i] == val) {
+                return cur;
+            }
+        }
+        int[] ret = new int[N + 1];
+        System.arraycopy(cur, 0, ret, 0, N);
+        ret[N] = val;
+        return ret;
+    }
 }
+
